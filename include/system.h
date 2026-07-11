@@ -49,7 +49,7 @@ struct ConfigEntry {
   X(wifi_ssid,      CFG_STRING, "")        \
   X(wifi_password,  CFG_STRING, "")
 // ============================================================================
-
+#define NAMA_PROYEK "Little Snowman"
 /**
  * @brief Satu baris skema: nama variabel, tipe, dan nilai default-nya.
  *

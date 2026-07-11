@@ -24,6 +24,14 @@
 #include "system.h"
 #include "platform_compat.h" // hanya untuk PLATFORM_NAME di boot banner
 
+// ============================================================================
+// NAMA PROYEK — ganti nilai ini sesuai proyek Anda. Ini SATU-SATUNYA tempat
+// yang perlu diedit saat template ini dipakai untuk proyek baru; tidak
+// mempengaruhi logika CLI/config/WiFi/OTA sama sekali, hanya tampil di
+// boot banner Serial Monitor.
+// ============================================================================
+#define NAMA_PROYEK "Little Snowman"
+
 String inputBuffer = "";
 
 void printPrompt() {
@@ -35,7 +43,9 @@ void setup() {
   delay(300);
 
   Serial.println();
-  Serial.println(F("=== CLI Config Template ==="));
+  Serial.print(F("=== "));
+  Serial.print(NAMA_PROYEK);
+  Serial.println(F(" ==="));
   Serial.print(F("Platform : "));
   Serial.println(PLATFORM_NAME);
 
@@ -59,7 +69,10 @@ void setup() {
   }
 
   printPrompt();
+  pinMode(2, OUTPUT);
 }
+
+unsigned long last_blink = 0;
 
 void loop() {
   while (Serial.available()) {
@@ -93,7 +106,11 @@ void loop() {
     }
     // karakter kontrol lain diabaikan
   }
-
   // -- logika aplikasi lain bisa jalan di sini, contoh: --
   // if (ConfigManager::getConfigBool(CFG_KEY_aktif)) { ... }
+  // blink led
+  if(millis() - last_blink >=  ConfigManager::getConfigInt(CFG_KEY_interval)){
+    digitalWrite(2,!digitalRead(2));
+    last_blink = millis();
+  }
 }

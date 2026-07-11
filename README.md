@@ -120,7 +120,85 @@ reboot
 
 ---
 
-## 6. Menjadikan Ini Basis Proyek Baru
+## 6. Mengakses & Menulis Variabel Konfigurasi dari Kode
+
+Selain lewat CLI, variabel konfigurasi juga bisa dibaca/ditulis langsung dari kode (`src/main.cpp` atau modul lain) lewat namespace `ConfigManager`.
+
+### Membaca (Get)
+
+Pakai `ConfigManager::getConfigXxx()`, dengan nama variabel memakai konstanta `CFG_KEY_<nama>` (bukan string literal) supaya salah ketik ketahuan saat **compile**, bukan diam-diam gagal saat runtime.
+
+```cpp
+#include "system.h"
+
+void loop() {
+  bool aktif      = ConfigManager::getConfigBool(CFG_KEY_aktif);
+  long interval   = ConfigManager::getConfigInt(CFG_KEY_interval);
+  float suhu      = ConfigManager::getConfigFloat(CFG_KEY_suhu);
+  String nama     = ConfigManager::getConfigString(CFG_KEY_nama);
+
+  if (aktif) {
+    // ... logika Anda, pakai interval/suhu/nama di sini
+  }
+}
+```
+
+Kalau variabel belum pernah di-`set`, fungsi ini mengembalikan **nilai default** dari skema (`CONFIG_LIST` di `system.h`) — selalu aman dipanggil, tidak perlu cek exists dulu.
+
+### Menulis (Set)
+
+Pakai `ConfigManager::configSet()`. Nilainya **selalu dalam bentuk teks (String)** apapun tipe aslinya:
+
+```cpp
+ConfigManager::configSet(CFG_KEY_interval, "2000");     // int
+ConfigManager::configSet(CFG_KEY_aktif, "true");         // bool
+ConfigManager::configSet(CFG_KEY_suhu, "27.5");           // float
+ConfigManager::configSet(CFG_KEY_nama, "Sensor Baru");   // string
+
+// simpan permanen ke flash (LittleFS) -- WAJIB kalau ingin bertahan setelah reboot
+ConfigManager::saveConfig();
+```
+
+| Hal | Penjelasan |
+|---|---|
+| Validasi otomatis | `configSet` menolak nilai yang tidak sesuai tipe skema (mis. `configSet(CFG_KEY_interval, "abc")` gagal & mencetak pesan error) |
+| Hanya variabel terdaftar | Nama yang tidak ada di `CONFIG_LIST` akan ditolak — tidak bisa membuat variabel baru secara dinamis dari kode |
+| Tidak otomatis permanen | `configSet()` hanya mengubah nilai di **RAM**. Kalau ingin nilainya bertahan setelah `reboot`, panggil `ConfigManager::saveConfig()` setelahnya |
+| Parameter `silent` | `configSet(name, value, true)` — argumen ketiga `true` membungkam pesan `"OK: ..."` yang biasanya tercetak ke Serial (dipakai internal oleh `WifiManager` supaya tidak dobel pesan) |
+
+### Contoh: baca sensor, update konfigurasi otomatis dari kode
+
+```cpp
+#include "system.h"
+
+void loop() {
+  float suhuTerukur = bacaSensorSuhu(); // fungsi Anda sendiri
+
+  // update nilai konfigurasi "suhu" dengan hasil pembacaan sensor (silent)
+  ConfigManager::configSet(CFG_KEY_suhu, String(suhuTerukur), true);
+
+  // cek ambang batas dari konfigurasi
+  float ambangBatas = ConfigManager::getConfigFloat(CFG_KEY_suhu);
+  if (suhuTerukur > ambangBatas) {
+    // ... aksi Anda
+  }
+
+  delay(ConfigManager::getConfigInt(CFG_KEY_interval));
+}
+```
+
+> `saveConfig()` **sengaja tidak dipanggil** tiap `loop()` di contoh ini supaya tidak menulis ke flash terus-menerus (flash punya batas siklus tulis-hapus). Cukup dipanggil sesekali — lewat perintah CLI `config save`, atau dari kode hanya saat nilainya benar-benar perlu permanen (mis. sekali saat `setup()`, atau saat event tertentu).
+
+---
+
+## 7. Menjadikan Ini Basis Proyek Baru
+
+### Mengganti nama proyek
+Edit nilai `NAMA_PROYEK` di bagian atas `src/main.cpp`:
+```cpp
+#define NAMA_PROYEK "CLI Config Template"
+```
+Nilai ini hanya tampil di boot banner Serial Monitor saat perangkat menyala — tidak memengaruhi logika CLI/config/WiFi/OTA sama sekali.
 
 ### Menambah variabel konfigurasi
 Edit **satu tempat saja**: makro `CONFIG_LIST` di `include/system.h`.
@@ -156,7 +234,7 @@ Bagian lain project (`system.cpp`, `main.cpp`) tidak perlu disentuh, selama chip
 
 ---
 
-## 7. Catatan Teknis
+## 8. Catatan Teknis
 
 - **`FLASH_ATTR`**: di ESP8266 fungsi memang sudah otomatis dieksekusi dari flash secara default; makro ini di ESP8266 memetakan ke `ICACHE_FLASH_ATTR` (penegasan/dokumentasi), dan kosong di ESP32 (tidak ada padanannya di arsitektur itu). Bukan optimasi RAM yang signifikan — sekadar penanda "fungsi ini manual/jarang dipanggil, tidak time-critical".
 - **HTTPS OTA** memakai `setInsecure()` (tidak memverifikasi sertifikat server). Cukup untuk skala kecil/pengembangan; untuk produksi sebaiknya pakai `setFingerprint()` / `setTrustAnchors()`.
@@ -165,6 +243,6 @@ Bagian lain project (`system.cpp`, `main.cpp`) tidak perlu disentuh, selama chip
 
 ---
 
-## 8. Lisensi
+## 9. Lisensi
 
 Silakan gunakan, modifikasi, dan sebarkan template ini secara bebas sebagai basis proyek Anda.
